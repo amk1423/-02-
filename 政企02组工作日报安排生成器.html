@@ -1,0 +1,1276 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>政企02组工作日报安排生成器</title>
+  <style>
+    :root {
+      --blue-700: #1459d9;
+      --blue-600: #1677ff;
+      --blue-500: #2f83ff;
+      --blue-100: #eaf3ff;
+      --blue-50: #f5f9ff;
+      --ink-900: #102a43;
+      --ink-700: #243b53;
+      --ink-500: #627d98;
+      --ink-400: #829ab1;
+      --line: #d9e6f2;
+      --line-strong: #c4d6e8;
+      --surface: #ffffff;
+      --canvas: #f7faff;
+      --success: #15956b;
+      --success-bg: #e9f9f2;
+      --warning: #ad6b00;
+      --warning-bg: #fff7e6;
+      --danger: #c93838;
+      --danger-bg: #fff0f0;
+      --shadow-sm: 0 4px 14px rgba(30, 75, 115, .05);
+      --shadow-md: 0 12px 30px rgba(30, 75, 115, .08);
+      --radius: 10px;
+      --font: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { min-width: 320px; background: var(--canvas); }
+
+    body {
+      margin: 0;
+      color: var(--ink-700);
+      background:
+        linear-gradient(180deg, #ffffff 0, #ffffff 80px, var(--canvas) 260px);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, select, textarea { font: inherit; }
+
+    button, select, textarea { outline: none; }
+
+    button:focus-visible, select:focus-visible, textarea:focus-visible {
+      box-shadow: 0 0 0 3px rgba(22, 119, 255, .17);
+      border-color: var(--blue-600);
+    }
+
+    .app-header {
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+      padding: 16px clamp(20px, 4vw, 56px);
+      background: rgba(255, 255, 255, .96);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      display: grid;
+      place-items: center;
+      color: var(--blue-600);
+      background: var(--blue-100);
+      border: 1px solid #cfe2ff;
+      border-radius: 9px;
+    }
+
+    .brand-mark svg { width: 19px; height: 19px; }
+
+    h1 {
+      margin: 0;
+      color: var(--ink-900);
+      font-size: clamp(21px, 2.1vw, 29px);
+      font-weight: 760;
+      letter-spacing: -.035em;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .date-control {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 0 0 auto;
+    }
+
+    .date-control label {
+      color: var(--ink-700);
+      font-size: 15px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .select-wrap { position: relative; }
+
+    .select-wrap::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: 13px;
+      width: 7px;
+      height: 7px;
+      border-right: 1.7px solid var(--ink-500);
+      border-bottom: 1.7px solid var(--ink-500);
+      transform: translateY(-68%) rotate(45deg);
+      pointer-events: none;
+    }
+
+    select {
+      width: 170px;
+      height: 44px;
+      appearance: none;
+      padding: 0 36px 0 14px;
+      color: var(--ink-900);
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    select:disabled { color: var(--ink-400); background: #f8fbff; cursor: not-allowed; }
+
+    main {
+      width: min(1500px, 100%);
+      margin: 0 auto;
+      padding: 22px clamp(20px, 4vw, 56px) 30px;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 43px;
+      margin-bottom: 18px;
+      padding: 8px 15px;
+      color: #426789;
+      background: var(--blue-50);
+      border: 1px solid #cfe2ff;
+      border-radius: 7px;
+      transition: background .2s ease, border-color .2s ease, color .2s ease;
+    }
+
+    .status-bar[data-state="ready"] { color: #29694f; background: var(--success-bg); border-color: #bfead5; }
+    .status-bar[data-state="warning"] { color: var(--warning); background: var(--warning-bg); border-color: #f4d99f; }
+    .status-bar[data-state="error"] { color: var(--danger); background: var(--danger-bg); border-color: #f2c4c4; }
+
+    .status-icon {
+      width: 20px;
+      height: 20px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 20px;
+      color: #fff;
+      background: var(--blue-600);
+      border-radius: 50%;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .status-bar[data-state="ready"] .status-icon { background: var(--success); }
+    .status-bar[data-state="warning"] .status-icon { background: #d58a14; }
+    .status-bar[data-state="error"] .status-icon { background: var(--danger); }
+
+    .status-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-text strong { margin-right: 8px; color: var(--ink-900); font-weight: 720; }
+    .status-bar[data-state="ready"] .status-text strong { color: #176b4a; }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, .98fr) minmax(0, 1.02fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .panel {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 19px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 13px;
+    }
+
+    .panel-title {
+      margin: 0;
+      color: var(--ink-900);
+      font-size: 18px;
+      font-weight: 750;
+      letter-spacing: -.015em;
+      line-height: 1.3;
+    }
+
+    .panel-caption {
+      margin: 3px 0 0;
+      color: var(--ink-400);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .input-area {
+      width: 100%;
+      min-height: 292px;
+      resize: vertical;
+      padding: 15px;
+      color: var(--ink-700);
+      background: #fcfdff;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.65;
+      transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+    }
+
+    .input-area::placeholder { color: #9aadc0; }
+    .input-area:hover { border-color: #a9c1db; }
+    .input-area:focus { background: #fff; border-color: var(--blue-600); box-shadow: 0 0 0 3px rgba(22, 119, 255, .12); }
+
+    .helper-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+      color: var(--ink-400);
+      font-size: 12px;
+    }
+
+    .helper-row span { min-width: 0; }
+
+    .text-button {
+      padding: 0;
+      color: var(--blue-600);
+      background: none;
+      border: 0;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .text-button:hover { color: var(--blue-700); text-decoration: underline; }
+
+    .sample-box {
+      margin-top: 16px;
+      padding-top: 15px;
+      border-top: 1px solid #edf3f8;
+    }
+
+    .sample-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      color: var(--ink-700);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .sample-title small { color: var(--ink-400); font-weight: 400; }
+
+    .sample-table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+    }
+
+    .sample-table {
+      width: 100%;
+      min-width: 620px;
+      border-collapse: collapse;
+      color: var(--ink-700);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .sample-table th,
+    .sample-table td {
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .sample-table th {
+      color: var(--ink-900);
+      background: var(--blue-50);
+      font-weight: 720;
+      white-space: nowrap;
+    }
+
+    .sample-table tr:last-child td { border-bottom: 0; }
+    .sample-table th:last-child, .sample-table td:last-child { border-right: 0; }
+
+    .sample-table .person { color: var(--ink-900); font-weight: 700; white-space: nowrap; }
+    .sample-table .muted { color: var(--ink-400); }
+
+    .panel-output { min-height: 478px; }
+
+    .output-box {
+      min-height: 410px;
+      max-height: 560px;
+      overflow: auto;
+      flex: 1;
+      margin: 0;
+      padding: 20px 20px 22px;
+      color: var(--ink-700);
+      background: #fff;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-word;
+      cursor: text;
+      caret-color: var(--blue-600);
+    }
+
+    .output-box:focus {
+      border-color: var(--blue-600);
+      box-shadow: 0 0 0 3px rgba(22, 119, 255, .12);
+      outline: none;
+    }
+
+    .output-box[data-empty="true"] {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9aadc0;
+      text-align: center;
+      white-space: normal;
+    }
+
+    .output-box .output-title {
+      color: var(--ink-900);
+      font-size: 17px;
+      font-weight: 760;
+      line-height: 1.55;
+    }
+
+    .output-box .output-section-title {
+      color: var(--ink-900);
+      font-weight: 760;
+    }
+
+    .output-box .output-lead { color: var(--ink-700); }
+
+    .output-box .output-item { padding-left: 0; }
+
+    .output-box .leave-item {
+      color: #80622d;
+      background: #fffbf2;
+      border-radius: 4px;
+    }
+
+    .output-box::-webkit-scrollbar,
+    .sample-table-wrap::-webkit-scrollbar,
+    .input-area::-webkit-scrollbar { width: 8px; height: 8px; }
+
+    .output-box::-webkit-scrollbar-thumb,
+    .sample-table-wrap::-webkit-scrollbar-thumb,
+    .input-area::-webkit-scrollbar-thumb { background: #c9d8e8; border-radius: 999px; }
+
+    .output-box::-webkit-scrollbar-track,
+    .sample-table-wrap::-webkit-scrollbar-track,
+    .input-area::-webkit-scrollbar-track { background: #f5f8fb; }
+
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 18px;
+      padding: 13px 0 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .button {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 20px;
+      color: var(--ink-700);
+      background: #fff;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 650;
+      white-space: nowrap;
+      transition: color .18s ease, background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+    }
+
+    .button:hover { color: var(--blue-700); border-color: #9abce5; background: #fbfdff; }
+    .button:active { transform: translateY(1px); }
+
+    .button.secondary { color: var(--blue-600); border-color: #7faeff; }
+    .button.primary {
+      color: #fff;
+      background: linear-gradient(135deg, #2f7eff, #1459d9);
+      border-color: var(--blue-600);
+      box-shadow: 0 6px 14px rgba(22, 119, 255, .18);
+    }
+
+    .button.primary:hover { color: #fff; background: linear-gradient(135deg, #1e70f3, #0f4fc5); border-color: #0f4fc5; box-shadow: 0 8px 17px rgba(22, 119, 255, .25); }
+    .button.primary:disabled, .button.secondary:disabled { color: #9aadc0; background: #f4f7fa; border-color: #dce5ed; box-shadow: none; cursor: not-allowed; }
+    .button.primary:disabled { color: #fff; background: #b8cee7; border-color: #b8cee7; }
+
+    .button svg { width: 17px; height: 17px; flex: 0 0 17px; }
+
+    .footer-note {
+      margin-top: 14px;
+      color: var(--ink-400);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 10;
+      right: 22px;
+      bottom: 22px;
+      max-width: min(420px, calc(100vw - 44px));
+      padding: 10px 14px;
+      color: #fff;
+      background: rgba(16, 42, 67, .94);
+      border-radius: 7px;
+      box-shadow: var(--shadow-md);
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 920px) {
+      .app-header { align-items: flex-start; flex-direction: column; gap: 14px; }
+      .date-control { width: 100%; }
+      .date-control .select-wrap, .date-control select { flex: 1; width: 100%; }
+      .workspace { grid-template-columns: 1fr; }
+      .panel-output { min-height: 0; }
+      .output-box { min-height: 340px; }
+    }
+
+    @media (max-width: 580px) {
+      body { background: var(--canvas); }
+      .app-header { min-height: 0; padding: 17px 16px; }
+      h1 { font-size: 21px; white-space: normal; }
+      main { padding: 16px 14px 24px; }
+      .status-bar { align-items: flex-start; margin-bottom: 14px; padding: 10px 11px; }
+      .status-text { white-space: normal; line-height: 1.5; }
+      .panel { padding: 15px; border-radius: 9px; }
+      .input-area { min-height: 250px; }
+      .bottom-bar { align-items: stretch; flex-direction: column-reverse; }
+      .button { width: 100%; }
+      .footer-note { text-align: center; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="3" width="16" height="18" rx="2.5"></rect>
+          <path d="M8 7h8M8 11h8M8 15h4"></path>
+          <path d="m15.5 15.3 1.2 1.2 2.4-2.7"></path>
+        </svg>
+      </div>
+      <h1>政企02组工作日报安排生成器</h1>
+    </div>
+    <div class="date-control">
+      <label for="dateSelect">选择日期</label>
+      <div class="select-wrap">
+        <select id="dateSelect" aria-label="选择需要生成的日期" disabled>
+          <option value="">请先粘贴工作表</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="status-bar" id="statusBar" data-state="idle" role="status" aria-live="polite">
+      <span class="status-icon" id="statusIcon">✓</span>
+      <div class="status-text" id="statusText"><strong>等待粘贴</strong>请粘贴本周工作表，工具会自动识别日期列和姓名列。</div>
+    </div>
+
+    <section class="workspace" aria-label="日报安排生成工作区">
+      <section class="panel panel-input" aria-labelledby="inputTitle">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title" id="inputTitle">粘贴本周工作表</h2>
+            <p class="panel-caption">支持直接从 KDocs / Excel 复制的制表符文本，也支持 Markdown 表格。</p>
+          </div>
+        </div>
+        <textarea id="sourceInput" class="input-area" spellcheck="false" placeholder="请将整周工作表直接粘贴到这里……
+
+支持：
+• Excel / KDocs 表格（制表符）
+• Markdown 表格（| 分隔）
+• 日期在一行或两行表头中均可"></textarea>
+        <div class="helper-row">
+          <span id="inputMeta">选中日期后，只读取该日期对应列。</span>
+          <button class="text-button" id="inlineSampleButton" type="button">快速填入示例</button>
+        </div>
+
+        <div class="sample-box">
+          <div class="sample-title">
+            <span>示例数据 <small>（可一键填充）</small></span>
+            <span class="muted" id="formatHint">支持 TSV / Markdown</span>
+          </div>
+          <div class="sample-table-wrap">
+            <table class="sample-table" aria-label="示例数据预览">
+              <thead>
+                <tr><th>姓名</th><th>星期一</th><th>星期二</th><th>星期三</th><th>星期四</th><th>星期五</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="muted"></td><td>2026/9/1</td><td>2026/9/2</td><td>2026/9/3</td><td>2026/9/4</td><td>2026/9/5</td></tr>
+                <tr><td class="person">林伟</td><td>客户跟进</td><td>项目洽谈</td><td>通拓科技、龙岗分公司</td><td>专线跟进</td><td>周总结</td></tr>
+                <tr><td class="person">张艳芳</td><td>妇幼项目</td><td>结算跟进</td><td>妇幼项目出帐</td><td>基础业务</td><td>资料整理</td></tr>
+                <tr><td class="person">胡樱花</td><td>客户拜访</td><td>商机跟进</td><td>上午休年假；下午客户拜访</td><td>客户拜访</td><td>周总结</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-output" aria-labelledby="outputTitle">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title" id="outputTitle">生成结果预览</h2>
+            <p class="panel-caption">地点仅取原表“地点”字段；生成后可直接编辑，再复制结果。</p>
+          </div>
+        </div>
+        <div class="output-box" id="outputBox" data-empty="true" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="false" tabindex="0" aria-label="可编辑的日报安排生成结果">粘贴工作表并选择日期后，结果会显示在这里。</div>
+      </section>
+    </section>
+
+    <div class="bottom-bar">
+      <button class="button" id="clearButton" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>
+        清空
+      </button>
+      <button class="button secondary" id="sampleButton" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h14v15H5z"></path><path d="M8 8h8M8 12h8M8 16h5"></path></svg>
+        示例数据
+      </button>
+      <button class="button primary" id="copyButton" type="button" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2"></path></svg>
+        一键复制结果
+      </button>
+    </div>
+    <div class="footer-note">本地离线处理 · 粘贴内容不会上传到网络</div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const sourceInput = document.getElementById("sourceInput");
+      const dateSelect = document.getElementById("dateSelect");
+      const outputBox = document.getElementById("outputBox");
+      const copyButton = document.getElementById("copyButton");
+      const clearButton = document.getElementById("clearButton");
+      const sampleButton = document.getElementById("sampleButton");
+      const inlineSampleButton = document.getElementById("inlineSampleButton");
+      const statusBar = document.getElementById("statusBar");
+      const statusIcon = document.getElementById("statusIcon");
+      const statusText = document.getElementById("statusText");
+      const inputMeta = document.getElementById("inputMeta");
+      const toast = document.getElementById("toast");
+
+      const WORK_TIME = "9:00-18:00";
+      const RESERVED_NAME_CELLS = new Set(["姓名", "人员", "成员", "客户经理", "日期", "时间", "上午", "下午", "目标", "动作", "工作目标", "工作安排", "任务", "合计", "备注"]);
+      const PERIOD_LABELS = new Set(["上午", "下午", "全天", "上午工作", "下午工作"]);
+      const TARGET_ROW_LABELS = new Set(["目标", "工作目标", "目的"]);
+      const ACTION_ROW_LABELS = new Set(["动作", "工作动作", "工作安排", "任务", "措施", "行动"]);
+      const CIRCLED_NUMBERS = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩", "⑪", "⑫", "⑬", "⑭", "⑮", "⑯", "⑰", "⑱", "⑲", "⑳"];
+      const LOCATION_ALIASES = new Map([["龙岗分公司", "天安数码城"]]);
+
+      const EXAMPLE_TSV = [
+        "姓名\t星期一\t星期二\t星期三\t星期四\t星期五",
+        "\t2026/9/1\t2026/9/2\t2026/9/3\t2026/9/4\t2026/9/5",
+        "林伟\t地点：天安数码城；上午：客户经理例会，确认本周重点；下午：跟进千百万成员拉新和区三院扩建信息化项目；目标：千百万成员拉新，跟进区三院扩建信息化项目，跟进龙岗消防电路建设；动作：集团驻点，项目投标准备，跟进专线建设进度。\t地点：龙岗分公司、通拓科技；上午：跟进专线商机；下午：跟进区三院扩建信息化项目；目标：千百万成员拉新，跟进区三院扩建信息化项目；动作：集团驻点，项目投标准备。\t地点：通拓科技；目标：形成客户清单；动作：电话联系并预约拜访。\t地点：永保科技（深圳）有限公司；目标：确认客户预算；动作：完成需求记录。\t地点：乐年广场写字楼；目标：完成周度复盘；动作：整理会议纪要。",
+        "张艳芳\t地点：天安数码城；上午：妇幼项目出帐跟进；下午：洽谈专线商机；目标：确认出帐节点；动作：联系项目相关人员。\t地点：天安数码城、左右家私；上午：妇幼项目出帐，后项结算，解黑，手工开票等事项处理；下午：洽谈专线及千百万业务商机；目标：跟进妇幼开办设备项目出帐，后项结算，解黑，手工开票等事项处理；动作：项目流程跟进，业务洽谈，处理集团基础工作。\t地点：天安数码城；目标：推进项目结算；动作：补齐流程材料。\t地点：天安数码城；目标：推动合作意向；动作：形成拜访纪要。\t地点：天安数码城；目标：完成本周节点；动作：更新项目台账。",
+        "胡樱花\t地点：天安数码城；目标：了解客户业务需求；动作：上门沟通。\t地点：天安数码城；上午：休年假；下午：拜访客户洽谈千百万业务、专线业务；目标：休年假；动作：上午休年假；下午上门拜访客户、寻求合作机会。\t地点：美福源公司；上午：休年假；下午：客户拜访；目标：休年假，保持客户触达；动作：休年假，记录合作需求。\t地点：天安数码城；目标：挖掘业务机会；动作：开展现场沟通。\t地点：天安数码城；目标：复盘客户跟进；动作：整理下周计划。",
+        "刘素华\t地点：天安数码城；目标：了解客户建设计划；动作：电话联系并形成记录。\t地点：海吉星、明辉实业；上午：摸查猎户集团专线需求；下午：跟进专线建设进度；目标：摸查猎户集团专线需求，跟进千百万商机，摸查信息化项目；动作：业务洽谈，跟进项目流程，处理集团基础工作。\t地点：天安数码城；目标：推进项目流程；动作：补充项目资料。\t地点：天安数码城；目标：明确交付节点；动作：更新台账。\t地点：天安数码城；目标：明确下周推进方向；动作：整理问题清单。",
+        "杨元兴\t地点：天安数码城；上午：联系产业园潜在客户；下午：写字楼陌拜；目标：建立客户联系；动作：电话沟通。\t地点：美福源公司；上午：联系产业园客户，沟通业务；下午：联系转介绍客户，寻求合作；目标：联系产业园客户，沟通业务；动作：跟进洽谈商机；上门拜访客户洽谈专线业务。\t地点：天安数码城；目标：形成商机线索；动作：现场拜访。\t地点：乐年广场写字楼；目标：推进意向客户；动作：持续跟进。\t地点：产业园；目标：汇总线索；动作：整理客户情况。",
+        "刘馥荣\t地点：天安数码城；目标：熟悉产品功能及资费；动作：整理产品资料。\t地点：佳兆业时代大厦；上午：洽谈集团专线和千百万；下午：拜访整理重点业务产品资料；目标：洽谈集团专线和千百万，拜访整理重点业务产品资料；动作：拜访客户，摸查业务商机；梳理近期重点产品的功能、资费及适用场景。\t地点：龙岗分公司；目标：梳理重点应用需求；动作：整理大模型、Agent及算力服务应用场景。\t地点：天安数码城；目标：推进应用落地；动作：沟通方案细节。\t地点：天安数码城；目标：复盘重点商机；动作：汇总跟进情况。"
+      ].join("\n");
+
+      let parsedWorkbook = null;
+      let currentResultText = "";
+      let toastTimer = null;
+
+      function normalizeText(value) {
+        return String(value == null ? "" : value)
+          .replace(/\uFEFF/g, "")
+          .replace(/\r\n?/g, "\n")
+          .replace(/\u00A0/g, " ")
+          .replace(/\u3000/g, " ")
+          .replace(/[：﹕]/g, "：")
+          .trim();
+      }
+
+      function cleanCell(value) {
+        return normalizeText(value)
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
+          .replace(/<[^>]+>/g, "")
+          .replace(/&nbsp;/gi, " ")
+          .split("\n")
+          .map(function (line) { return line.trim(); })
+          .filter(Boolean)
+          .join("\n")
+          .trim();
+      }
+
+      function splitMarkdownRow(line) {
+        let text = String(line || "").trim();
+        if (text.startsWith("|")) text = text.slice(1);
+        if (text.endsWith("|")) text = text.slice(0, -1);
+        const cells = [];
+        let current = "";
+        let escaped = false;
+        for (let i = 0; i < text.length; i += 1) {
+          const char = text[i];
+          if (escaped) {
+            current += char;
+            escaped = false;
+          } else if (char === "\\") {
+            escaped = true;
+          } else if (char === "|") {
+            cells.push(cleanCell(current));
+            current = "";
+          } else {
+            current += char;
+          }
+        }
+        if (escaped) current += "\\";
+        cells.push(cleanCell(current));
+        return cells;
+      }
+
+      function isMarkdownSeparatorRow(row) {
+        return row.length > 0 && row.every(function (cell) {
+          return !cell || /^:?-{3,}:?$/.test(cell.replace(/\s/g, ""));
+        });
+      }
+
+      function parseTsvRows(text) {
+        const rows = [];
+        let row = [];
+        let cell = "";
+        let quoted = false;
+        for (let index = 0; index < text.length; index += 1) {
+          const char = text[index];
+          if (char === '"') {
+            if (quoted && text[index + 1] === '"') {
+              cell += '"';
+              index += 1;
+            } else {
+              quoted = !quoted;
+            }
+          } else if (char === "\t" && !quoted) {
+            row.push(cleanCell(cell));
+            cell = "";
+          } else if (char === "\n" && !quoted) {
+            row.push(cleanCell(cell));
+            if (row.some(function (value) { return value !== ""; })) rows.push(row);
+            row = [];
+            cell = "";
+          } else {
+            cell += char;
+          }
+        }
+        row.push(cleanCell(cell));
+        if (row.some(function (value) { return value !== ""; })) rows.push(row);
+        return rows;
+      }
+
+      function parseSourceRows(raw) {
+        const normalized = normalizeText(raw);
+        if (!normalized) return { rows: [], format: "empty" };
+        const lines = normalized.split("\n");
+        const hasTabs = lines.slice(0, 12).some(function (line) { return line.indexOf("\t") !== -1; });
+        const hasMarkdown = lines.slice(0, 12).some(function (line) {
+          return /^\s*\|/.test(line) && (line.match(/\|/g) || []).length >= 2;
+        });
+        const format = hasTabs ? "tsv" : (hasMarkdown ? "markdown" : "line");
+        let rows = format === "tsv"
+          ? parseTsvRows(normalized)
+          : lines.filter(function (line) { return line.trim() !== ""; }).map(function (line) {
+            if (format === "markdown") return splitMarkdownRow(line);
+            return [cleanCell(line)];
+          });
+        if (format === "markdown") rows = rows.filter(function (row) { return !isMarkdownSeparatorRow(row); });
+        const maxColumns = rows.reduce(function (max, row) { return Math.max(max, row.length); }, 0);
+        rows = rows.map(function (row) {
+          const next = row.slice();
+          while (next.length < maxColumns) next.push("");
+          return next;
+        });
+        return { rows: rows, format: format, maxColumns: maxColumns };
+      }
+
+      function dateFromMatch(match, raw, hasYear) {
+        const year = hasYear ? Number(match[1]) : new Date().getFullYear();
+        const month = Number(hasYear ? match[2] : match[1]);
+        const day = Number(hasYear ? match[3] : match[2]);
+        if (!month || !day || month > 12 || day > 31) return null;
+        const date = new Date(year, month - 1, day);
+        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+        const week = ["日", "一", "二", "三", "四", "五", "六"][date.getDay()];
+        return {
+          year: year,
+          month: month,
+          day: day,
+          key: year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0"),
+          label: year + "年" + month + "月" + day + "日（周" + week + "）",
+          shortLabel: month + "月" + day + "日（周" + week + "）",
+          raw: raw
+        };
+      }
+
+      function findDateToken(value) {
+        const text = normalizeText(value).replace(/[．。]/g, ".");
+        let match = text.match(/(?<!\d)(\d{4})\s*[\/\-.年]\s*(\d{1,2})\s*[\/\-.月]\s*(\d{1,2})\s*日?/);
+        if (match) return dateFromMatch(match, text, true);
+        match = text.match(/(?<!\d)(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+        if (match) return dateFromMatch(match, text, false);
+        return null;
+      }
+
+      function headerValue(rows, columnIndex, maxRows) {
+        return rows.slice(0, maxRows).map(function (row) { return cleanCell(row[columnIndex] || ""); }).filter(Boolean);
+      }
+
+      function isPeriodHeader(value) {
+        return PERIOD_LABELS.has(normalizeText(value).replace(/[：:]/g, ""));
+      }
+
+      function detectDateGroups(rows, maxColumns) {
+        const scanRows = Math.min(rows.length, 8);
+        const foundByColumn = new Map();
+        for (let rowIndex = 0; rowIndex < scanRows; rowIndex += 1) {
+          for (let columnIndex = 0; columnIndex < maxColumns; columnIndex += 1) {
+            const token = findDateToken(rows[rowIndex][columnIndex] || "");
+            if (token && !foundByColumn.has(columnIndex)) foundByColumn.set(columnIndex, { date: token, rowIndex: rowIndex });
+          }
+        }
+        const sortedColumns = Array.from(foundByColumn.keys()).sort(function (a, b) { return a - b; });
+        const groups = new Map();
+        sortedColumns.forEach(function (columnIndex, position) {
+          const entry = foundByColumn.get(columnIndex);
+          const key = entry.date.key;
+          if (!groups.has(key)) groups.set(key, { date: entry.date, indices: [], firstColumn: columnIndex, headerRow: entry.rowIndex });
+          const group = groups.get(key);
+          group.indices.push(columnIndex);
+
+          // 兼容“一个日期下分上午/下午两列”的复制表格：只有明确出现上午/下午表头时才扩展列，避免读到其他日期。
+          let nextDateColumn = sortedColumns[position + 1];
+          if (nextDateColumn == null) nextDateColumn = maxColumns;
+          for (let adjacent = columnIndex + 1; adjacent < nextDateColumn; adjacent += 1) {
+            const adjacentHeaders = headerValue(rows, adjacent, Math.min(scanRows, entry.rowIndex + 3));
+            if (adjacentHeaders.some(isPeriodHeader)) group.indices.push(adjacent);
+          }
+        });
+        groups.forEach(function (group) {
+          group.indices = Array.from(new Set(group.indices)).sort(function (a, b) { return a - b; });
+        });
+        return Array.from(groups.values()).sort(function (a, b) { return a.firstColumn - b.firstColumn; });
+      }
+
+      function findNameColumn(rows, maxColumns, dateGroups) {
+        const explicitNames = new Set(["姓名", "人员", "成员", "客户经理", "员工", "负责人", "姓名/人员"]);
+        let best = { index: 0, score: -Infinity };
+        const dateColumns = new Set(dateGroups.reduce(function (all, group) { return all.concat(group.indices); }, []));
+        for (let columnIndex = 0; columnIndex < maxColumns; columnIndex += 1) {
+          if (dateColumns.has(columnIndex)) continue;
+          const values = rows.slice(0, Math.min(rows.length, 10)).map(function (row) { return normalizeText(row[columnIndex] || ""); });
+          let score = 0;
+          values.forEach(function (value, index) {
+            if (explicitNames.has(value)) score += 20 - index;
+            if (value && !findDateToken(value) && !/^[-:：]+$/.test(value) && value.length <= 12 && !/时间|日期|星期|上午|下午|地点|目标|动作/.test(value)) {
+              if (index >= 1) score += 2;
+            }
+          });
+          if (columnIndex === 0 && values.some(function (value) { return explicitNames.has(value); })) score += 8;
+          if (score > best.score) best = { index: columnIndex, score: score };
+        }
+        return best.index;
+      }
+
+      function detectPeriodKind(value) {
+        const text = cleanCell(value).replace(/[\s\u3000]/g, "");
+        if (/^上午/.test(text)) return "morning";
+        if (/^下午/.test(text)) return "afternoon";
+        if (/^全天/.test(text)) return "all-day";
+        return "";
+      }
+
+      function isNameCell(value) {
+        const text = normalizeText(value);
+        if (!text || RESERVED_NAME_CELLS.has(text) || PERIOD_LABELS.has(text) || detectPeriodKind(text)) return false;
+        if (/^(合计|总计|备注|说明|日期|时间)$/i.test(text)) return false;
+        if (findDateToken(text)) return false;
+        return text.length <= 20;
+      }
+
+      function getRowKind(row, nameColumn) {
+        for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
+          if (columnIndex === nameColumn) continue;
+          const value = normalizeText(row[columnIndex] || "").replace(/[：:]/g, "");
+          if (TARGET_ROW_LABELS.has(value)) return "target";
+          if (ACTION_ROW_LABELS.has(value)) return "action";
+        }
+        return "general";
+      }
+
+      function cleanName(value) {
+        const text = normalizeText(value).replace(/^[•·●▪]+\s*/, "");
+        const roleMatch = text.match(/^(?:客户经理|客户代表|经理|姓名)\s*[-—_：:]\s*(.+)$/);
+        return roleMatch ? roleMatch[1].trim() : text;
+      }
+
+      function getBodyStart(rows, dateGroups) {
+        if (!dateGroups.length) return 0;
+        return Math.max.apply(null, dateGroups.map(function (group) { return group.headerRow; })) + 1;
+      }
+
+      function parseWorkbook(raw) {
+        const source = parseSourceRows(raw);
+        if (!source.rows.length) return { source: source, dates: [], nameColumn: null, persons: [], error: "empty" };
+        const dates = detectDateGroups(source.rows, source.maxColumns || 0);
+        if (!dates.length) return { source: source, dates: [], nameColumn: null, persons: [], error: "no-date" };
+        const nameColumn = findNameColumn(source.rows, source.maxColumns, dates);
+        const bodyStart = getBodyStart(source.rows, dates);
+        const persons = [];
+        const personMap = new Map();
+        for (let rowIndex = bodyStart; rowIndex < source.rows.length; rowIndex += 1) {
+          const row = source.rows[rowIndex];
+          const rawName = cleanCell(row[nameColumn] || "");
+          const name = cleanName(rawName);
+          const period = detectPeriodKind(rawName);
+          let person = null;
+          if (isNameCell(rawName)) {
+            person = personMap.get(name);
+            if (!person) {
+              person = { name: name, rows: [], firstRow: rowIndex };
+              personMap.set(name, person);
+              persons.push(person);
+            }
+          } else if (period && persons.length) {
+            // KDocs 常把同一成员拆成“上午”行和“下午”行，姓名只写在第一行；这里把时段行并回上一位成员。
+            person = persons[persons.length - 1];
+          } else if (!rawName && persons.length) {
+            // 兼容合并姓名单元格：姓名为空的续行属于上一位成员。
+            person = persons[persons.length - 1];
+          }
+          if (person) person.rows.push({ row: row, rowIndex: rowIndex, kind: getRowKind(row, nameColumn), period: period || "" });
+        }
+        return { source: source, dates: dates, nameColumn: nameColumn, bodyStart: bodyStart, persons: persons, error: persons.length ? null : "no-person" };
+      }
+
+      function splitSegments(text) {
+        return cleanCell(text)
+          .replace(/；(?=(?:上午|下午|地点|目标|动作|工作目标|工作安排|任务|拜访地点|位置)\s*[:：]?)/g, "\n")
+          .replace(/(?<!^)(?<!\n)(?=\d{1,2}\s*[、.．)）]\s*(?:时间|地点|目标|动作))/g, "\n")
+          .split("\n")
+          .map(function (line) { return line.trim(); })
+          .filter(Boolean);
+      }
+
+      function addUnique(list, value) {
+        const clean = normalizeText(value).replace(/^[,，、;；。\s]+|[,，、;；。\s]+$/g, "");
+        if (!clean) return;
+        if (!list.some(function (item) { return item === clean; })) list.push(clean);
+      }
+
+      function cleanContent(value) {
+        return normalizeText(value)
+          .replace(/^[•·●▪\-—]+\s*/, "")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function isLeaveText(text) {
+        return /休息|休年假|年假|调休|公休|请假|病假|事假|婚假|产假|陪产假|丧假/.test(text);
+      }
+
+      function addUniqueLocation(list, value) {
+        const clean = normalizeText(value).replace(/^[,，、;；。\/\s]+|[,，、;；。\/\s]+$/g, "");
+        if (!clean) return;
+        const canonical = LOCATION_ALIASES.get(clean) || clean;
+        if (!list.includes(canonical)) list.push(canonical);
+      }
+
+      function extractLocations(labeledLocations) {
+        const locations = [];
+        labeledLocations.forEach(function (value) {
+          value.split(/[、,，；;\/]/).forEach(function (part) {
+            addUniqueLocation(locations, part);
+          });
+        });
+        return locations;
+      }
+
+      function extractDayCell(person, dateGroup, kind) {
+        const cells = [];
+        person.rows.forEach(function (entry) {
+          if (kind && entry.kind !== kind) return;
+          // 关键约束：这里只访问当前 dateGroup.indices，绝不读取其他日期列。
+          dateGroup.indices.forEach(function (columnIndex) {
+            const cell = cleanCell(entry.row[columnIndex] || "");
+            if (cell) cells.push(cell);
+          });
+        });
+        return cells.join("\n");
+      }
+
+      function parsedFieldOrMerged(parsed, field) {
+        if (!parsed) return "";
+        const fieldValue = field === "target" ? parsed.target : parsed.action;
+        if (fieldValue && fieldValue !== "待补充") return fieldValue;
+        return parsed.merged || fieldValue || "";
+      }
+
+      function parseCellContent(text) {
+        const segments = splitSegments(text);
+        const fields = { morning: [], afternoon: [], locations: [], targets: [], actions: [], other: [] };
+        let currentPeriod = "other";
+        segments.forEach(function (segment) {
+          const normalizedSegment = segment.replace(/^\s*(?:\d{1,2}|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*[、.．)）:：-]?\s*/, "");
+          const labelMatch = normalizedSegment.match(/^(上午|下午|全天|时间|地点|拜访地点|位置|目标|工作目标|目的|动作|工作动作|工作安排|任务|措施|行动)\s*[:：]?\s*(.*)$/);
+          if (labelMatch) {
+            const label = labelMatch[1];
+            const value = cleanContent(labelMatch[2]);
+            if (!value) return;
+            if (label === "上午") currentPeriod = "morning";
+            else if (label === "下午") currentPeriod = "afternoon";
+            else if (label === "时间") return;
+            else if (label === "地点" || label === "拜访地点" || label === "位置") addUniqueLocation(fields.locations, value);
+            else if (/目标|目的/.test(label)) addUnique(fields.targets, value);
+            else if (/动作|安排|任务|措施|行动/.test(label)) addUnique(fields.actions, value);
+            if (label === "上午" || label === "下午" || label === "全天") {
+              const inline = value.split(/[；;]/).map(function (item) { return item.trim(); }).filter(Boolean);
+              inline.forEach(function (item) { fields[currentPeriod].push(item); });
+            }
+            return;
+          }
+          fields[currentPeriod].push(normalizedSegment);
+        });
+
+        const periodParts = fields.morning.concat(fields.afternoon).concat(fields.other).map(cleanContent).filter(Boolean);
+        const merged = [];
+        periodParts.forEach(function (item) { if (!merged.includes(item)) merged.push(item); });
+        const fullText = merged.join("；");
+        const locations = extractLocations(fields.locations);
+        const nonLocationParts = merged.filter(function (part) { return !locations.includes(part); });
+        const fallback = nonLocationParts.join("；") || fullText;
+        const leaveParts = merged.filter(isLeaveText);
+        const targetParts = leaveParts.concat(fields.targets).filter(function (item, index, list) { return list.indexOf(item) === index; });
+        const actionParts = leaveParts.concat(fields.actions).filter(function (item, index, list) { return list.indexOf(item) === index; });
+        const target = targetParts.length ? targetParts.join("；") : fallback;
+        const action = actionParts.length ? actionParts.join("；") : fallback;
+        return {
+          raw: text,
+          merged: fullText,
+          target: target || "待补充",
+          action: action || "待补充",
+          locations: locations,
+          isLeave: isLeaveText(fullText)
+        };
+      }
+
+      function extractTimeRanges(text) {
+        const times = [];
+        const pattern = /(?<!\d)(\d{1,2}(?::|：)\d{2})\s*(?:-|—|–|~|～|至)\s*(\d{1,2}(?::|：)\d{2})(?!\d)/g;
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+          const value = match[1].replace("：", ":") + "-" + match[2].replace("：", ":");
+          if (!times.includes(value)) times.push(value);
+        }
+        return times;
+      }
+
+      function selectedRecords(dateKey) {
+        if (!parsedWorkbook || !dateKey) return [];
+        const dateGroup = parsedWorkbook.dates.find(function (item) { return item.date.key === dateKey; });
+        if (!dateGroup) return [];
+        return parsedWorkbook.persons.map(function (person) {
+          const generalCell = extractDayCell(person, dateGroup, "general");
+          const targetCell = extractDayCell(person, dateGroup, "target");
+          const actionCell = extractDayCell(person, dateGroup, "action");
+          const rawCell = [generalCell, targetCell, actionCell].filter(Boolean).join("\n");
+          const allContent = parseCellContent(rawCell);
+          const targetContent = targetCell ? parseCellContent(targetCell) : null;
+          const actionContent = actionCell ? parseCellContent(actionCell) : null;
+          const content = {
+            raw: rawCell,
+            merged: allContent.merged,
+            target: targetCell ? parsedFieldOrMerged(targetContent, "target") : allContent.target,
+            action: actionCell ? parsedFieldOrMerged(actionContent, "action") : allContent.action,
+            locations: allContent.locations,
+            isLeave: allContent.isLeave
+          };
+          return { name: person.name, content: content, rawCell: rawCell };
+        }).filter(function (record) { return record.rawCell || record.name; });
+      }
+
+      function memberMarker(index) {
+        return CIRCLED_NUMBERS[index] || (index + 1) + "、";
+      }
+
+      function finishClause(value, ending) {
+        const text = normalizeText(value) || "待补充";
+        if (/[；。！？]$/.test(text)) return text;
+        return text + ending;
+      }
+
+      function renderOutputText(date, records) {
+        const locations = [];
+        records.forEach(function (record) {
+          record.content.locations.forEach(function (location) { addUniqueLocation(locations, location); });
+        });
+        const timeText = WORK_TIME;
+        const people = records.map(function (record) { return record.name; }).join("，") || "待确认";
+        const lines = [
+          "【林伟队" + date.month + "月" + date.day + "日工作部署】",
+          "1、时间：" + timeText,
+          "2、地点：" + (locations.length ? locations.join("、") : "无明确地点"),
+          "3、人员：客户经理-" + people,
+          "4、目标："
+        ];
+        records.forEach(function (record, index) {
+          lines.push(memberMarker(index) + record.name + "-" + finishClause(record.content.target, "；"));
+        });
+        lines.push("5、动作：");
+        records.forEach(function (record, index) {
+          lines.push(memberMarker(index) + record.name + "-" + finishClause(record.content.action, index === records.length - 1 ? "。" : "；"));
+        });
+        return lines.join("\n");
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (char) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
+        });
+      }
+
+      function renderOutputHtml(date, records) {
+        const locations = [];
+        records.forEach(function (record) {
+          record.content.locations.forEach(function (location) { addUniqueLocation(locations, location); });
+        });
+        const timeText = WORK_TIME;
+        const lines = [];
+        lines.push('<div class="output-title">【林伟队' + date.month + '月' + date.day + '日工作部署】</div>');
+        lines.push('<div><span class="output-section-title">1、时间：</span>' + escapeHtml(timeText) + '</div>');
+        lines.push('<div><span class="output-section-title">2、地点：</span>' + escapeHtml(locations.length ? locations.join("、") : "无明确地点") + '</div>');
+        lines.push('<div><span class="output-section-title">3、人员：</span>客户经理-' + escapeHtml(records.map(function (record) { return record.name; }).join("，") || "待确认") + '</div>');
+        lines.push('<div class="output-section-title">4、目标：</div>');
+        records.forEach(function (record, index) {
+          lines.push('<div class="output-item' + (record.content.isLeave ? ' leave-item' : '') + '">' + escapeHtml(memberMarker(index) + record.name + "-" + finishClause(record.content.target, "；")) + '</div>');
+        });
+        lines.push('<div class="output-section-title">5、动作：</div>');
+        records.forEach(function (record, index) {
+          lines.push('<div class="output-item' + (record.content.isLeave ? ' leave-item' : '') + '">' + escapeHtml(memberMarker(index) + record.name + "-" + finishClause(record.content.action, index === records.length - 1 ? "。" : "；")) + '</div>');
+        });
+        return lines.join("");
+      }
+
+      function setStatus(state, title, detail) {
+        statusBar.dataset.state = state;
+        statusIcon.textContent = state === "error" ? "!" : (state === "warning" ? "!" : "✓");
+        statusText.innerHTML = "<strong>" + escapeHtml(title) + "</strong>" + escapeHtml(detail);
+      }
+
+      function renderEmpty(message) {
+        outputBox.dataset.empty = "true";
+        outputBox.textContent = message || "粘贴工作表并选择日期后，结果会显示在这里。";
+        currentResultText = "";
+        copyButton.disabled = true;
+      }
+
+      function updateDateOptions(dates) {
+        const previous = dateSelect.value;
+        dateSelect.innerHTML = "";
+        if (!dates.length) {
+          dateSelect.disabled = true;
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "未识别到日期";
+          dateSelect.appendChild(option);
+          return;
+        }
+        dates.forEach(function (group) {
+          const option = document.createElement("option");
+          option.value = group.date.key;
+          option.textContent = group.date.label;
+          dateSelect.appendChild(option);
+        });
+        dateSelect.disabled = false;
+        dateSelect.value = dates.some(function (item) { return item.date.key === previous; }) ? previous : dates[0].date.key;
+      }
+
+      function refreshFromInput(options) {
+        const raw = sourceInput.value;
+        if (!normalizeText(raw)) {
+          parsedWorkbook = null;
+          updateDateOptions([]);
+          inputMeta.textContent = "选中日期后，只读取该日期对应列。";
+          setStatus("idle", "等待粘贴", "请粘贴本周工作表，工具会自动识别日期列和姓名列。");
+          renderEmpty();
+          return;
+        }
+        parsedWorkbook = parseWorkbook(raw);
+        updateDateOptions(parsedWorkbook.dates);
+        if (parsedWorkbook.error === "no-date") {
+          inputMeta.textContent = "未找到日期表头，请检查日期是否以 2026/9/3、2026-09-03 或 9月3日 写入。";
+          setStatus("error", "未识别日期", "请保留包含日期的表头行后再试。");
+          renderEmpty("暂未识别到日期列，请检查粘贴内容。\n支持 2026/9/3、2026-09-03、2026年9月3日、9月3日。");
+          return;
+        }
+        if (parsedWorkbook.error === "no-person") {
+          inputMeta.textContent = "已找到日期，但没有识别到姓名行。";
+          setStatus("warning", "需要检查姓名列", "已找到日期列，请确认姓名位于日期列左侧的独立一列。");
+          renderEmpty("已找到日期，但暂未识别到人员。\n请检查姓名列是否包含姓名、人员或成员表头。");
+          return;
+        }
+        const dateLabel = parsedWorkbook.dates.map(function (group) { return group.date.shortLabel; }).join("、");
+        inputMeta.textContent = "姓名列：第 " + (parsedWorkbook.nameColumn + 1) + " 列 · 日期列：" + parsedWorkbook.dates.length + " 个 · 分隔方式：" + (parsedWorkbook.source.format === "tsv" ? "制表符" : (parsedWorkbook.source.format === "markdown" ? "Markdown" : "单列文本"));
+        setStatus("ready", "已识别", "日期：" + dateLabel + "。生成时只读取所选日期对应列，上午与下午会合并。");
+        renderSelectedDate(options && options.keepDate ? dateSelect.value : dateSelect.value);
+      }
+
+      function renderSelectedDate() {
+        if (!parsedWorkbook || !dateSelect.value) {
+          renderEmpty();
+          return;
+        }
+        const group = parsedWorkbook.dates.find(function (item) { return item.date.key === dateSelect.value; });
+        const records = selectedRecords(dateSelect.value);
+        if (!group || !records.length) {
+          renderEmpty("所选日期暂无可生成的人员内容。");
+          copyButton.disabled = true;
+          return;
+        }
+        currentResultText = renderOutputText(group.date, records);
+        outputBox.dataset.empty = "false";
+        outputBox.innerHTML = renderOutputHtml(group.date, records);
+        copyButton.disabled = false;
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 2400);
+      }
+
+      function loadExample() {
+        sourceInput.value = EXAMPLE_TSV;
+        refreshFromInput();
+        if (Array.from(dateSelect.options).some(function (option) { return option.value === "2026-09-02"; })) {
+          dateSelect.value = "2026-09-02";
+          renderSelectedDate();
+        }
+        showToast("示例数据已填入，可切换日期查看结果。");
+      }
+
+      function clearAll() {
+        sourceInput.value = "";
+        parsedWorkbook = null;
+        updateDateOptions([]);
+        inputMeta.textContent = "选中日期后，只读取该日期对应列。";
+        setStatus("idle", "等待粘贴", "请粘贴本周工作表，工具会自动识别日期列和姓名列。");
+        renderEmpty();
+        showToast("已清空当前内容。");
+        sourceInput.focus();
+      }
+
+      async function copyResult() {
+        currentResultText = outputBox.dataset.empty === "false" ? outputBox.innerText.trim() : "";
+        if (!currentResultText) return;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(currentResultText);
+          } else {
+            const helper = document.createElement("textarea");
+            helper.value = currentResultText;
+            helper.style.position = "fixed";
+            helper.style.opacity = "0";
+            document.body.appendChild(helper);
+            helper.select();
+            document.execCommand("copy");
+            helper.remove();
+          }
+          showToast("日报安排已复制到剪贴板。");
+        } catch (error) {
+          showToast("复制未成功，请在结果区域中手动选择复制。");
+        }
+      }
+
+      sourceInput.addEventListener("input", function () { refreshFromInput(); });
+      dateSelect.addEventListener("change", function () { renderSelectedDate(); });
+      sampleButton.addEventListener("click", loadExample);
+      inlineSampleButton.addEventListener("click", loadExample);
+      clearButton.addEventListener("click", clearAll);
+      copyButton.addEventListener("click", copyResult);
+      outputBox.addEventListener("input", function () {
+        if (outputBox.dataset.empty === "false") {
+          currentResultText = outputBox.innerText.trim();
+          copyButton.disabled = !currentResultText;
+        }
+      });
+
+      // 初始状态：保证直接双击打开时不依赖任何外部资源。
+      updateDateOptions([]);
+      renderEmpty();
+
+      // 让浏览器测试与本地调试可以安全读取解析器结果，但不暴露任何网络能力。
+      window.WorkReportTool = {
+        parseWorkbook: parseWorkbook,
+        parseCellContent: parseCellContent,
+        renderOutputText: renderOutputText,
+        getState: function () { return { parsedWorkbook: parsedWorkbook, resultText: currentResultText }; }
+      };
+    }());
+  </script>
+</body>
+</html>
