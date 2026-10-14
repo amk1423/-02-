@@ -615,7 +615,7 @@
       const toast = document.getElementById("toast");
 
       const WORK_TIME = "9:00-18:00";
-      const RESERVED_NAME_CELLS = new Set(["姓名", "人员", "成员", "客户经理", "日期", "时间", "上午", "下午", "目标", "动作", "工作目标", "工作安排", "任务", "合计", "备注"]);
+      const RESERVED_NAME_CELLS = new Set(["姓名", "人员", "成员", "客户经理", "日期", "时间", "上午", "下午", "目标", "动作", "工作目标", "工作安排", "任务", "合计", "总计", "备注", "说明", "员工", "负责人", "时段", "星期", "例", "示例", "示范", "填写示例", "模板"]);
       const PERIOD_LABELS = new Set(["上午", "下午", "全天", "上午工作", "下午工作"]);
       const TARGET_ROW_LABELS = new Set(["目标", "工作目标", "目的"]);
       const ACTION_ROW_LABELS = new Set(["动作", "工作动作", "工作安排", "任务", "措施", "行动"]);
@@ -693,6 +693,37 @@
       }
 
       function parseTsvRows(text) {
+        // 只把单元格开头的双引号视为 Excel 包裹符，正文中的引号不改变表格结构。
+        const physicalLines = text.split("\n");
+        let nameColumn = 0;
+        let expectedColumns = 0;
+        const nameHeaders = new Set(["姓名", "人员", "成员", "客户经理", "员工", "负责人", "姓名/人员"]);
+        physicalLines.slice(0, 12).forEach(function (line) {
+          const cells = line.split("\t").map(function (value) { return cleanCell(value).replace(/^"|"$/g, ""); });
+          const headerIndex = cells.findIndex(function (value) { return nameHeaders.has(value); });
+          if (headerIndex !== -1) nameColumn = headerIndex;
+          if (headerIndex !== -1 || cells.some(function (value) { return findDateToken(value) && !/时间|地点|目标|动作/.test(value); })) {
+            expectedColumns = Math.max(expectedColumns, cells.length);
+          }
+        });
+
+        function isNextTableRow(index) {
+          const end = text.indexOf("\n", index);
+          const line = text.slice(index, end === -1 ? text.length : end);
+          if (!line.includes("\t")) return false;
+          const cells = line.split("\t");
+          const name = cleanCell(cells[nameColumn] || "").replace(/^"|"$/g, "");
+          if (isNameCell(name) || RESERVED_NAME_CELLS.has(name)) return true;
+          if (detectPeriodKind(name)) return true;
+          return !name && expectedColumns > 0 && cells.length >= expectedColumns;
+        }
+
+        function startsNextField(index) {
+          const next = text.slice(index);
+          // 偶数个末尾引号可能是额外包裹符，也可能是正文转义；仅有明确下格边界时恢复。
+          return /^(?:"(?!")|$)/.test(next);
+        }
+
         const rows = [];
         let row = [];
         let cell = "";
@@ -700,16 +731,38 @@
         for (let index = 0; index < text.length; index += 1) {
           const char = text[index];
           if (char === '"') {
-            if (quoted && text[index + 1] === '"') {
-              cell += '"';
-              index += 1;
+            if (!quoted) {
+              if (!cell) quoted = true;
+              else cell += char;
             } else {
-              quoted = !quoted;
+              let end = index + 1;
+              while (text[end] === '"') end += 1;
+              const count = end - index;
+              const next = text[end];
+              const atBoundary = next === "\t" || next === "\n" || next === undefined;
+              const extraCloser = count % 2 === 0 && atBoundary &&
+                (next === undefined || (next === "\t" && startsNextField(end + 1)) || (next === "\n" && isNextTableRow(end + 1)));
+              if (atBoundary && (count % 2 === 1 || extraCloser)) {
+                cell += '"'.repeat(extraCloser ? (count - 2) / 2 : (count - 1) / 2);
+                quoted = false;
+              } else {
+                cell += '"'.repeat(Math.ceil(count / 2));
+              }
+              index = end - 1;
             }
-          } else if (char === "\t" && !quoted) {
+          } else if (char === "\t" && (!quoted || (text[index + 1] === '"' && text[index + 2] !== '"' && row.length + 1 < expectedColumns))) {
+            // 未闭合的包裹符也不能吞掉下一格明确的 Excel 引号起点。
+            quoted = false;
             row.push(cleanCell(cell));
             cell = "";
-          } else if (char === "\n" && !quoted) {
+          } else if (char === "\n" && (!quoted || isNextTableRow(index + 1))) {
+            const nextLineEnd = text.indexOf("\n", index + 1);
+            const nextLine = text.slice(index + 1, nextLineEnd === -1 ? text.length : nextLineEnd);
+            if (!quoted && !nextLine.includes("\t") && /^\s*(?:\d{1,2}\s*[、.．)）]\s*)?(?:时间|地点|目标|动作|工作目标|工作安排|任务|拜访地点|上午|下午)\s*[:：]/.test(nextLine)) {
+              cell += "\n";
+              continue;
+            }
+            quoted = false;
             row.push(cleanCell(cell));
             if (row.some(function (value) { return value !== ""; })) rows.push(row);
             row = [];
@@ -724,8 +777,9 @@
       }
 
       function parseSourceRows(raw) {
-        const normalized = normalizeText(raw);
-        if (!normalized) return { rows: [], format: "empty" };
+        // 整表不能 trim：首尾空列的制表符决定日期和姓名的列位置。
+        const normalized = String(raw == null ? "" : raw).replace(/\uFEFF/g, "").replace(/\r\n?/g, "\n").replace(/\u00A0/g, " ").replace(/\u3000/g, " ");
+        if (!normalized.trim()) return { rows: [], format: "empty" };
         const lines = normalized.split("\n");
         const hasTabs = lines.slice(0, 12).some(function (line) { return line.indexOf("\t") !== -1; });
         const hasMarkdown = lines.slice(0, 12).some(function (line) {
@@ -785,11 +839,29 @@
       }
 
       function detectDateGroups(rows, maxColumns) {
-        const scanRows = Math.min(rows.length, 8);
+        let scanRows = Math.min(rows.length, 8);
+        const nameHeaders = new Set(["姓名", "人员", "成员", "客户经理", "员工", "负责人", "姓名/人员"]);
+        // 表头在首位成员/示例行之前结束，正文里提到的日期不能抢走下午列。
+        let headerNameColumn = -1;
+        let nameHeaderRow = -1;
+        for (let rowIndex = 0; rowIndex < scanRows && headerNameColumn === -1; rowIndex += 1) {
+          headerNameColumn = rows[rowIndex].findIndex(function (value) { return nameHeaders.has(cleanCell(value)); });
+          if (headerNameColumn !== -1) nameHeaderRow = rowIndex;
+        }
+        if (headerNameColumn !== -1) {
+          for (let rowIndex = nameHeaderRow + 1; rowIndex < scanRows; rowIndex += 1) {
+            const value = cleanName(rows[rowIndex][headerNameColumn] || "");
+            if (isNameCell(value) || /^(?:例|示例|示范|填写示例|模板)$/.test(value)) {
+              scanRows = rowIndex;
+              break;
+            }
+          }
+        }
         const foundByColumn = new Map();
         for (let rowIndex = 0; rowIndex < scanRows; rowIndex += 1) {
           for (let columnIndex = 0; columnIndex < maxColumns; columnIndex += 1) {
-            const token = findDateToken(rows[rowIndex][columnIndex] || "");
+            const value = cleanCell(rows[rowIndex][columnIndex] || "");
+            const token = /时间|地点|目标|动作|工作|任务|拜访|跟进/.test(value) ? null : findDateToken(value);
             if (token && !foundByColumn.has(columnIndex)) foundByColumn.set(columnIndex, { date: token, rowIndex: rowIndex });
           }
         }
@@ -820,13 +892,14 @@
         const explicitNames = new Set(["姓名", "人员", "成员", "客户经理", "员工", "负责人", "姓名/人员"]);
         let best = { index: 0, score: -Infinity };
         const dateColumns = new Set(dateGroups.reduce(function (all, group) { return all.concat(group.indices); }, []));
+        const firstDateColumn = Math.min.apply(null, dateGroups.map(function (group) { return group.firstColumn; }));
         for (let columnIndex = 0; columnIndex < maxColumns; columnIndex += 1) {
-          if (dateColumns.has(columnIndex)) continue;
+          if (dateColumns.has(columnIndex) || columnIndex >= firstDateColumn) continue;
           const values = rows.slice(0, Math.min(rows.length, 10)).map(function (row) { return normalizeText(row[columnIndex] || ""); });
           let score = 0;
           values.forEach(function (value, index) {
             if (explicitNames.has(value)) score += 20 - index;
-            if (value && !findDateToken(value) && !/^[-:：]+$/.test(value) && value.length <= 12 && !/时间|日期|星期|上午|下午|地点|目标|动作/.test(value)) {
+            if (isNameCell(value)) {
               if (index >= 1) score += 2;
             }
           });
@@ -838,18 +911,18 @@
 
       function detectPeriodKind(value) {
         const text = cleanCell(value).replace(/[\s\u3000]/g, "");
-        if (/^上午/.test(text)) return "morning";
-        if (/^下午/.test(text)) return "afternoon";
-        if (/^全天/.test(text)) return "all-day";
+        if (/^上午(?:工作)?(?:[:：]|$)/.test(text)) return "morning";
+        if (/^下午(?:工作)?(?:[:：]|$)/.test(text)) return "afternoon";
+        if (/^全天(?:[:：]|$)/.test(text)) return "all-day";
         return "";
       }
 
       function isNameCell(value) {
-        const text = normalizeText(value);
+        const text = cleanName(value);
         if (!text || RESERVED_NAME_CELLS.has(text) || PERIOD_LABELS.has(text) || detectPeriodKind(text)) return false;
-        if (/^(合计|总计|备注|说明|日期|时间)$/i.test(text)) return false;
+        if (/时间|日期|星期|地点|目标|动作|工作|任务|拜访|跟进|流程|业务|客户|项目|培训|合同|梳理|联系|提单|办理|沟通|缴纳|交付|待补充|示例|示范/.test(text)) return false;
         if (findDateToken(text)) return false;
-        return text.length <= 20;
+        return /^[\u3400-\u9fff]{2,6}(?:[·•][\u3400-\u9fff]{1,6})?$/.test(text) || /^[A-Za-z][A-Za-z .'-]{0,38}[A-Za-z]$/.test(text);
       }
 
       function getRowKind(row, nameColumn) {
@@ -882,6 +955,7 @@
         const bodyStart = getBodyStart(source.rows, dates);
         const persons = [];
         const personMap = new Map();
+        let currentPerson = null;
         for (let rowIndex = bodyStart; rowIndex < source.rows.length; rowIndex += 1) {
           const row = source.rows[rowIndex];
           const rawName = cleanCell(row[nameColumn] || "");
@@ -895,12 +969,16 @@
               personMap.set(name, person);
               persons.push(person);
             }
-          } else if (period && persons.length) {
+            currentPerson = person;
+          } else if (period && currentPerson) {
             // KDocs 常把同一成员拆成“上午”行和“下午”行，姓名只写在第一行；这里把时段行并回上一位成员。
-            person = persons[persons.length - 1];
-          } else if (!rawName && persons.length) {
+            person = currentPerson;
+          } else if (!rawName && currentPerson) {
             // 兼容合并姓名单元格：姓名为空的续行属于上一位成员。
-            person = persons[persons.length - 1];
+            person = currentPerson;
+          } else if (rawName) {
+            // 示例、合计及其他非姓名行划断归属，空姓名续行不能并到上一位成员。
+            currentPerson = null;
           }
           if (person) person.rows.push({ row: row, rowIndex: rowIndex, kind: getRowKind(row, nameColumn), period: period || "" });
         }
@@ -1050,7 +1128,7 @@
             isLeave: allContent.isLeave
           };
           return { name: person.name, content: content, rawCell: rawCell };
-        }).filter(function (record) { return record.rawCell || record.name; });
+        }).filter(function (record) { return Boolean(record.rawCell); });
       }
 
       function memberMarker(index) {
@@ -1275,3 +1353,4 @@
   </script>
 </body>
 </html>
+
